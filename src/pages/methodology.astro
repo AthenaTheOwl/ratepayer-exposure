@@ -1,0 +1,232 @@
+---
+import {
+  COST_ALLOCATION,
+  PJM_LDA_RATES,
+  VALID_YEARS,
+  ZIP_TO_LDA,
+} from "../lib/bill_delta";
+
+const dom = COST_ALLOCATION.DOM;
+const domRates = PJM_LDA_RATES.DOM;
+const years = [...VALID_YEARS];
+
+type Assumption = {
+  name: string;
+  value: string;
+  tag: "conservative" | "median" | "upper-bound";
+  source_url: string;
+  last_verified: string;
+};
+
+const assumptions: Assumption[] = [
+  {
+    name: "data_center_load_share (DOM)",
+    value: dom.data_center_load_share.toString(),
+    tag: "median",
+    source_url: dom.source_url,
+    last_verified: dom.last_verified,
+  },
+  {
+    name: "residential_allocation_share (DOM)",
+    value: dom.residential_allocation_share.toString(),
+    tag: "conservative",
+    source_url: dom.source_url,
+    last_verified: dom.last_verified,
+  },
+  {
+    name: "typical_residential_kwh_per_year (DOM)",
+    value: dom.typical_residential_kwh_per_year.toString() + " kWh",
+    tag: "median",
+    source_url:
+      "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf",
+    last_verified: dom.last_verified,
+  },
+  {
+    name: "baseline_usd_per_year (DOM)",
+    value: "$" + dom.baseline_usd_per_year.toString(),
+    tag: "median",
+    source_url:
+      "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf",
+    last_verified: dom.last_verified,
+  },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>methodology — ratepayer exposure</title>
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        max-width: 48rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+        color: #111;
+      }
+      h1, h2 { font-weight: 600; }
+      h1 { font-size: 1.5rem; }
+      h2 { font-size: 1.15rem; margin-top: 2rem; }
+      pre {
+        background: #f4f4f4;
+        padding: 0.75rem 1rem;
+        overflow-x: auto;
+        font-size: 0.95rem;
+        border-radius: 4px;
+      }
+      table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; }
+      th, td {
+        border: 1px solid #ccc;
+        padding: 0.4rem 0.6rem;
+        text-align: left;
+        font-size: 0.9rem;
+        vertical-align: top;
+      }
+      th { background: #f0f0f0; }
+      .tag {
+        display: inline-block;
+        padding: 0.1rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .tag.conservative { background: #cfe; color: #053; }
+      .tag.median { background: #def; color: #035; }
+      .tag.upper-bound { background: #fec; color: #530; }
+      .deferred li { margin: 0.25rem 0; }
+      nav { font-size: 0.875rem; margin-bottom: 1.5rem; }
+      a { color: #225; }
+    </style>
+  </head>
+  <body>
+    <nav><a href="/calculator/">calculator</a></nav>
+    <h1>methodology</h1>
+    <p>
+      this page exists so a skeptical reader can audit every number the
+      calculator emits. the formula is below; every input value is
+      tabled with a tag (conservative / median / upper-bound) and a
+      source URL.
+    </p>
+
+    <h2>formula</h2>
+    <pre>delta_usd(zone, year) =
+    capacity_price_delta_usd_per_mw_day(zone, year)
+  * 365
+  * residential_allocation_share(zone)
+  * data_center_load_share(zone)
+  * typical_residential_kwh_per_year(zone)
+  / 1000   # kWh -> MWh; result lands in USD/year per customer
+
+baseline_usd(zone) = static field on the cost_allocation record
+</pre>
+    <p>
+      see <code>src/lib/bill_delta.ts</code> for the implementation.
+      a vitest suite (<code>src/lib/bill_delta.test.ts</code>) pins
+      three reference cases (low / median / upper) against
+      hand-computed values.
+    </p>
+
+    <h2>v0.1 coverage</h2>
+    <p>
+      one PJM LDA zone (Dominion / DOM) and one ZIP prefix
+      ({Object.keys(ZIP_TO_LDA).join(", ")} → DOM). every other ZIP
+      returns the sentinel "outside v0.1 coverage". widening lands in
+      spec 0004 (DOM ZIP coverage) and spec 0005 (other PJM zones).
+    </p>
+
+    <h2>assumptions (DEC-001 charter)</h2>
+    <p>
+      every assumption used by <code>billDelta()</code> appears in the
+      table below with its DEC-001 tag and a source URL. the full
+      narrative for each tag lives in
+      <a href="https://github.com/">decisions/DEC-001-assumption-charter.md</a>
+      in the repo.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>assumption</th>
+          <th>value</th>
+          <th>tag</th>
+          <th>source</th>
+          <th>last verified</th>
+        </tr>
+      </thead>
+      <tbody>
+        {assumptions.map((a) => (
+          <tr>
+            <td><code>{a.name}</code></td>
+            <td>{a.value}</td>
+            <td><span class={`tag ${a.tag}`}>{a.tag}</span></td>
+            <td><a href={a.source_url} rel="noopener">source</a></td>
+            <td>{a.last_verified}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h2>DOM zone capacity-price deltas, 2026-2030</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>year</th>
+          <th>capacity price delta ($/MW-day)</th>
+          <th>source</th>
+          <th>retrieved</th>
+          <th>last verified</th>
+        </tr>
+      </thead>
+      <tbody>
+        {years.map((y) => (
+          <tr>
+            <td>{y}</td>
+            <td>${domRates[y].capacity_price_delta_usd_per_mw_day}</td>
+            <td><a href={domRates[y].source_url} rel="noopener">source</a></td>
+            <td>{domRates[y].retrieved_iso}</td>
+            <td>{domRates[y].last_verified}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h2>sanity bound</h2>
+    <p>
+      <code>eval/sanity_bounds.py</code> walks every covered (zone,
+      year) and asserts <code>delta_usd / baseline_usd &lt;= 2.0</code>.
+      a violation either means a real edge case (which must be called
+      out here) or a bug (which must be fixed before the build can
+      ship). v0.1 wires this as <code>npm run check:bounds</code>.
+    </p>
+
+    <h2>what v0.1 does not cover (deferred to spec 0003+)</h2>
+    <ul class="deferred">
+      <li>
+        automated citation gate (<code>npm run check:citations</code>) —
+        every number on this page has a source by review; the build-time
+        HTML scan lands in spec 0003.
+      </li>
+      <li>
+        voice lint (<code>npm run check:voice</code>) — banned-terms
+        scan lands in spec 0003.
+      </li>
+      <li>
+        accessibility gate (<code>npm run check:a11y</code>) — axe-core
+        integration lands in spec 0003.
+      </li>
+      <li>
+        link-check on source URLs — lands with the citation gate in
+        spec 0003.
+      </li>
+      <li>
+        additional PJM zones beyond DOM — spec 0005.
+      </li>
+      <li>
+        ISOs beyond PJM, commercial / industrial bills — out of scope
+        per <code>AGENTS.md</code>.
+      </li>
+    </ul>
+  </body>
+</html>

@@ -1,0 +1,188 @@
+---
+import { VALID_YEARS } from "../lib/bill_delta";
+
+const years = [...VALID_YEARS];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ratepayer exposure calculator</title>
+    <meta
+      name="description"
+      content="per-customer bill-delta from data-center load growth, PJM DOM zone, 2026-2030"
+    />
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        max-width: 42rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+        color: #111;
+      }
+      h1 { font-weight: 600; font-size: 1.5rem; }
+      label { display: block; margin-top: 1rem; font-weight: 500; }
+      input, select {
+        padding: 0.5rem;
+        font-size: 1rem;
+        border: 1px solid #888;
+        border-radius: 4px;
+        width: 100%;
+        max-width: 14rem;
+      }
+      output {
+        display: block;
+        margin-top: 1.5rem;
+        padding: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fafafa;
+        min-height: 2.5rem;
+        white-space: pre-wrap;
+      }
+      .noscript-note, .error {
+        color: #802;
+        margin-top: 1rem;
+      }
+      .sources {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: #444;
+      }
+      .sources a { color: #225; }
+      nav { font-size: 0.875rem; margin-bottom: 1.5rem; }
+    </style>
+  </head>
+  <body>
+    <nav><a href="/methodology/">methodology</a></nav>
+    <h1>ratepayer exposure calculator</h1>
+    <p>
+      enter a US ZIP code and a year (2026-2030). returns the projected
+      annual bill-delta attributable to data-center load growth in the
+      local PJM zone. v0.1 covers one prefix (Richmond, VA, DOM zone);
+      every other ZIP returns the literal sentinel below.
+    </p>
+    <p>
+      computation runs entirely in this browser tab. nothing is sent to a
+      server. see the <a href="/methodology/">methodology page</a> for
+      the formula and every assumption.
+    </p>
+
+    <form id="calc-form" autocomplete="off">
+      <label>
+        ZIP code
+        <input
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]{5}"
+          maxlength="5"
+          id="zip"
+          name="zip"
+          placeholder="23219"
+        />
+      </label>
+      <label>
+        year
+        <select id="year" name="year">
+          {years.map((y) => <option value={y}>{y}</option>)}
+        </select>
+      </label>
+    </form>
+
+    <output id="result" aria-live="polite">
+      enter a ZIP and pick a year.
+    </output>
+
+    <div class="sources" id="sources" hidden>
+      <strong>sources for this result:</strong>
+      <ul id="sources-list"></ul>
+    </div>
+
+    <noscript>
+      <p class="noscript-note">
+        calculator requires JavaScript. the
+        <a href="/methodology/">methodology page</a> has the formula and
+        the inputs so the result can be hand-computed.
+      </p>
+    </noscript>
+
+    <script>
+      import { billDelta, VALID_YEARS } from "../lib/bill_delta";
+
+      const zipInput = document.getElementById("zip") as HTMLInputElement;
+      const yearInput = document.getElementById("year") as HTMLSelectElement;
+      const out = document.getElementById("result") as HTMLOutputElement;
+      const sourcesBox = document.getElementById("sources") as HTMLDivElement;
+      const sourcesList = document.getElementById(
+        "sources-list"
+      ) as HTMLUListElement;
+
+      function fmt(n: number): string {
+        return n.toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 0,
+        });
+      }
+
+      function render() {
+        const zip = zipInput.value.trim();
+        if (zip === "") {
+          out.textContent = "enter a ZIP and pick a year.";
+          sourcesBox.hidden = true;
+          return;
+        }
+        const yearNum = Number(yearInput.value);
+        const year = (VALID_YEARS as readonly number[]).includes(yearNum)
+          ? (yearNum as 2026 | 2027 | 2028 | 2029 | 2030)
+          : (2026 as const);
+
+        const r = billDelta({ zip, year });
+        sourcesBox.hidden = true;
+        sourcesList.innerHTML = "";
+
+        if (r.kind === "input_error") {
+          out.textContent =
+            r.reason === "bad_zip"
+              ? "ZIP must be 5 digits."
+              : "year must be 2026-2030.";
+          return;
+        }
+        if (r.kind === "out_of_coverage") {
+          out.textContent =
+            "outside v0.1 coverage (one PJM zone, DOM, supported).";
+          return;
+        }
+        out.textContent =
+          `projected ${r.year} bill-delta: ${fmt(r.delta_usd)} per year ` +
+          `(against a ${fmt(r.baseline_usd)} baseline).`;
+        for (const url of r.sources) {
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = url;
+          a.textContent = url;
+          a.rel = "noopener";
+          li.appendChild(a);
+          sourcesList.appendChild(li);
+        }
+        sourcesBox.hidden = false;
+      }
+
+      zipInput.addEventListener("input", render);
+      yearInput.addEventListener("change", render);
+
+      // honor ?zip=...&year=... so a stranger can deep-link a result.
+      const params = new URLSearchParams(window.location.search);
+      const zipParam = params.get("zip");
+      const yearParam = params.get("year");
+      if (zipParam) zipInput.value = zipParam;
+      if (yearParam && (VALID_YEARS as readonly number[]).includes(Number(yearParam))) {
+        yearInput.value = yearParam;
+      }
+      if (zipParam || yearParam) render();
+    </script>
+  </body>
+</html>
