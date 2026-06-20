@@ -1,0 +1,24 @@
+{
+  "name": "ratepayer-exposure",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "per-customer bill-impact model for data-center-driven capacity cost growth in PJM",
+  "license": "MIT",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "check:bounds": "python eval/sanity_bounds.py",
+    "check:stale-data": "node scripts/check_stale_data.mjs"
+  },
+  "dependencies": {
+    "astro": "^4.16.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0"
+  }
+}
