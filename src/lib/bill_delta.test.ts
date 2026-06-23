@@ -64,8 +64,48 @@ describe("billDelta — reference cases", () => {
   });
 });
 
+const COMED_FACTOR =
+  365 *
+  COST_ALLOCATION.COMED.residential_allocation_share *
+  COST_ALLOCATION.COMED.data_center_load_share *
+  COST_ALLOCATION.COMED.typical_residential_kwh_per_year /
+  1000;
+
+function expectedComedDelta(
+  year: 2026 | 2027 | 2028 | 2029 | 2030
+): number {
+  const raw =
+    PJM_LDA_RATES.COMED[year].capacity_price_delta_usd_per_mw_day *
+    COMED_FACTOR;
+  return Math.round(raw * 100) / 100;
+}
+
+describe("billDelta — COMED reference cases", () => {
+  it("low case: 2026 maps 606 -> COMED", () => {
+    const r = billDelta({ zip: "60601", year: 2026 });
+    expect(r.kind).toBe("ok");
+    if (r.kind !== "ok") return;
+    expect(r.lda).toBe("COMED");
+    expect(r.zip_prefix).toBe("606");
+    expect(r.delta_usd).toBeCloseTo(expectedComedDelta(2026), 2);
+    expect(r.delta_usd).toBeCloseTo(195.46, 2);
+    expect(r.baseline_usd).toBe(1140);
+    expect(r.sources.length).toBeGreaterThanOrEqual(2);
+    expect(r.delta_usd / r.baseline_usd).toBeLessThan(0.5);
+  });
+
+  it("upper case: 2030 stays under the 2x bound", () => {
+    const r = billDelta({ zip: "60601", year: 2030 });
+    expect(r.kind).toBe("ok");
+    if (r.kind !== "ok") return;
+    expect(r.delta_usd).toBeCloseTo(expectedComedDelta(2030), 2);
+    expect(r.delta_usd).toBeCloseTo(1172.74, 2);
+    expect(r.delta_usd / r.baseline_usd).toBeLessThanOrEqual(2.0);
+  });
+});
+
 describe("billDelta — coverage and input errors", () => {
-  it("returns out_of_coverage for a ZIP outside the v0.1 prefix", () => {
+  it("returns out_of_coverage for a ZIP outside covered prefixes", () => {
     const r = billDelta({ zip: "10001", year: 2026 });
     expect(r.kind).toBe("out_of_coverage");
     if (r.kind === "out_of_coverage") {
@@ -112,6 +152,7 @@ describe("data integrity", () => {
 
   it("zip prefix lookup returns the LDA code", () => {
     expect(lookupLda("23219")).toEqual({ prefix: "232", lda: "DOM" });
+    expect(lookupLda("60601")).toEqual({ prefix: "606", lda: "COMED" });
     expect(lookupLda("99999")).toBeNull();
   });
 });

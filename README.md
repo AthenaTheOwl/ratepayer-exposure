@@ -1,45 +1,68 @@
 # RatepayerExposure
 
-For any US ratepayer, estimate how much of their electricity bill
-increase over 2026-2030 is attributable to data-center load growth in
-their utility / ISO, given current cost-allocation rules.
+For a US ratepayer in a covered PJM zone, estimate how much of their
+electricity bill increase over 2026-2030 is attributable to data-center
+load growth in their utility / ISO, given current cost-allocation rules.
 
 ## What this is
 
-A small public calculator with a long methodology page. The first
-slice covers PJM-zone residents only. The user enters a ZIP code; the
-calculator returns a projected 2026-2030 bill delta attributable to
-data-center load, with every assumption cited.
+A small public calculator with a long methodology page. The user enters
+a ZIP code and a year (2026-2030); the calculator returns a projected
+annual bill delta attributable to data-center load, with every
+assumption cited. Computation runs entirely client-side — no ZIP code is
+sent to a server or logged.
 
-The repo's discipline is that no number renders without a citation. A
-methodology page lists every assumption, every source URL, and the
-sanity-bound check that caught any prior version where the delta
-exceeded 200% (the bound enforced in CI).
+The repo's discipline is that no number renders without a source. The
+methodology page lists every assumption, its source URL, and the
+sanity-bound check that rejects any version where the delta exceeds 2x
+of baseline (the bound enforced by `eval/sanity_bounds.py` and the
+vitest suite from both sides).
 
-This repo is downstream of InterconnectAlpha (capacity-price curves)
-and GridSilicon (site data). It is upstream of nothing.
+This repo is downstream of InterconnectAlpha (capacity-price curves) and
+GridSilicon (site data). It is upstream of nothing.
 
-## Status
+## Coverage
 
-v0 scaffold; no implementation yet. Spec 0002 lands the calculator
-page and the methodology page. Spec 0003 lands the citation renderer
-and the sanity-bound test.
+v0.2 covers two PJM LDA zones, each keyed by one ZIP-3 prefix:
+
+| zone | utility | ZIP prefix | example ZIP |
+|---|---|---|---|
+| `DOM` | Dominion Energy Virginia | `232xx` | `23219` (Richmond, VA) |
+| `COMED` | Commonwealth Edison | `606xx` | `60601` (Chicago, IL) |
+
+Every other ZIP returns the literal sentinel "outside v0.2 coverage".
+Widening each zone's ZIP footprint lands in spec 0004; more PJM zones in
+spec 0005. ISOs beyond PJM and commercial / industrial bills are out of
+scope (see `AGENTS.md`).
 
 ## How to run
 
-Will land in spec 0002. The expected shape:
-
 ```bash
 npm install
-npm run dev
-npm run build
-npm run check:citations
-npm run check:bounds
-npm run check:voice
+npm run dev          # local dev server
+npm run build        # static build to dist/
+npm test             # vitest: 11 reference + integrity cases
+npm run check:bounds # python sanity-bound check (no delta > 2x baseline)
+npm run check:stale-data  # warn on any last_verified older than 90 days
 ```
 
-For v0 the only working command is `npm install` against the
-placeholder `package.json` that lands in PR 1.
+The build emits a static site to `dist/` (`index`, `calculator`,
+`methodology`). `npm run check:bounds` requires Python 3 (stdlib only,
+no pip install).
+
+## live demo
+
+This is a static Astro site; Vercel auto-detects the framework and
+serves `dist/` with no extra config.
+
+Deploy steps:
+
+1. go to https://vercel.com/new
+2. import the GitHub repo `AthenaTheOwl/ratepayer-exposure`
+3. keep the auto-detected Astro preset (build `npm run build`, output
+   `dist/`) and click **Deploy**
+
+<!-- live-url: https://__________.vercel.app -->
 
 ## Layout
 
@@ -47,24 +70,30 @@ placeholder `package.json` that lands in PR 1.
 ratepayer-exposure/
   src/
     pages/
+      index.astro
       calculator.astro
       methodology.astro
-    data/
-      pjm_lda_rates.json
-      cost_allocation_rules.json
     lib/
-      bill_delta.ts
-      citation_renderer.ts
+      bill_delta.ts        # pure model + inlined cited data (DOM, COMED)
+      bill_delta.test.ts   # vitest reference + integrity cases
   eval/
-    sanity_bounds.py
+    sanity_bounds.py       # independent re-impl of the bound check
+  scripts/
+    check_stale_data.mjs   # warn on stale last_verified fields
   decisions/
     DEC-001-assumption-charter.md
-  specs/0001-foundation/
-  docs/first-pr.md
+  specs/
+  docs/
+  astro.config.mjs
   AGENTS.md
   LICENSE
   README.md
 ```
+
+The model data (capacity-price deltas, cost-allocation parameters) is
+inlined in `src/lib/bill_delta.ts` rather than loaded from JSON, so the
+client bundle has no runtime fetches and the vitest suite pins the same
+constants the user sees.
 
 ## License
 
@@ -73,6 +102,7 @@ MIT. See LICENSE.
 ## Caveat
 
 This is the kind of artifact that gets attacked by utility lobbying
-shops. PJM-only first version must be bulletproof or it is discredited
-in 48 hours. Discipline is the differentiator: every output number
-cites a source, every assumption is named, every bound is checked.
+shops. The PJM zones must be bulletproof or the work is discredited.
+Discipline is the differentiator: every output number cites a source,
+every assumption is named and tagged, every bound is checked from two
+independent implementations.
