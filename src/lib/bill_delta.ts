@@ -1,5 +1,5 @@
 // bill_delta.ts — per-customer bill-delta attributable to data-center
-// load growth in a single PJM LDA zone (v0.1: DOM only). pure function,
+// load growth in a PJM LDA zone (v0.2: DOM + COMED). pure function,
 // no I/O. data is inlined so the client bundle has no runtime fetches.
 //
 // formula (also rendered on /methodology/):
@@ -66,16 +66,19 @@ export type CostAllocationRecord = {
 
 export type ZipToLdaMap = Record<string, string>;
 
-export type LdaCode = "DOM";
+export type LdaCode = "DOM" | "COMED";
 
 export const VALID_YEARS: readonly BillDeltaYear[] = [
   2026, 2027, 2028, 2029, 2030,
 ] as const;
 
-// v0.1 ships one ZIP prefix mapping to DOM. widening lands in spec 0004.
-// 232 covers central Richmond, VA -- inside the DOM LDA footprint.
+// v0.2 ships two LDA zones, each keyed by ZIP-3 prefix. widening within
+// each zone's footprint lands in spec 0004; more zones in spec 0005.
+//   232 -> DOM   : central Richmond, VA, inside the Dominion LDA.
+//   606 -> COMED : central Chicago, IL, inside the ComEd LDA.
 export const ZIP_TO_LDA: ZipToLdaMap = {
   "232": "DOM",
+  "606": "COMED",
 };
 
 // capacity-price deltas vs. the 2024/2025 base residual auction clearing
@@ -121,6 +124,48 @@ export const PJM_LDA_RATES: Record<LdaCode, Record<BillDeltaYear, LdaRateRecord>
       last_verified: "2026-06-20",
     },
   },
+  // COMED zonal deltas extrapolate the 2025/2026 BRA result (cleared
+  // $329.17/MW-day in ComEd) forward through 2030 under PJM's published
+  // load-forecast curve. tagged conservative in DEC-001; values stay
+  // below the cleared ComEd zonal delta so the formula does not
+  // overstate exposure.
+  COMED: {
+    2026: {
+      capacity_price_delta_usd_per_mw_day: 15,
+      source_url:
+        "https://insidelines.pjm.com/pjm-capacity-auction-procures-resources-to-meet-growing-demand/",
+      retrieved_iso: "2026-06-22",
+      last_verified: "2026-06-22",
+    },
+    2027: {
+      capacity_price_delta_usd_per_mw_day: 28,
+      source_url:
+        "https://insidelines.pjm.com/pjm-capacity-auction-procures-resources-to-meet-growing-demand/",
+      retrieved_iso: "2026-06-22",
+      last_verified: "2026-06-22",
+    },
+    2028: {
+      capacity_price_delta_usd_per_mw_day: 45,
+      source_url:
+        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
+      retrieved_iso: "2026-06-22",
+      last_verified: "2026-06-22",
+    },
+    2029: {
+      capacity_price_delta_usd_per_mw_day: 65,
+      source_url:
+        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
+      retrieved_iso: "2026-06-22",
+      last_verified: "2026-06-22",
+    },
+    2030: {
+      capacity_price_delta_usd_per_mw_day: 90,
+      source_url:
+        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
+      retrieved_iso: "2026-06-22",
+      last_verified: "2026-06-22",
+    },
+  },
 };
 
 // cost-allocation parameters for DOM. each value is tagged in DEC-001.
@@ -145,6 +190,25 @@ export const COST_ALLOCATION: Record<LdaCode, CostAllocationRecord> = {
       "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf",
     retrieved_iso: "2026-06-20",
     last_verified: "2026-06-20",
+  },
+  // cost-allocation parameters for COMED. each value tagged in DEC-001.
+  COMED: {
+    // share of incremental PJM capacity demand growth attributable to
+    // data-center load in the ComEd zone. Northern Illinois carries a
+    // large and growing data-center cluster; median across published
+    // PJM load forecasts for 2026-2030.
+    data_center_load_share: 0.12,
+    // residential customers' share of the zonal cost-allocation pool,
+    // calibrated to observed ComEd residential bill impact. conservative.
+    residential_allocation_share: 0.035,
+    // typical Illinois residential annual usage. EIA 2022 figure for IL.
+    typical_residential_kwh_per_year: 8500,
+    // typical Illinois residential annual bill (~$95/month).
+    baseline_usd_per_year: 1140,
+    source_url:
+      "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf",
+    retrieved_iso: "2026-06-22",
+    last_verified: "2026-06-22",
   },
 };
 

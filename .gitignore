@@ -4,6 +4,7 @@ node_modules/
 generated/*.pdf
 playtest-archive/scratch/
 .astro/
+src/env.d.ts
 dist/
 .env
 .DS_Store

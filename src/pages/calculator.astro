@@ -62,8 +62,9 @@ const years = [...VALID_YEARS];
     <p>
       enter a US ZIP code and a year (2026-2030). returns the projected
       annual bill-delta attributable to data-center load growth in the
-      local PJM zone. v0.1 covers one prefix (Richmond, VA, DOM zone);
-      every other ZIP returns the literal sentinel below.
+      local PJM zone. v0.2 covers two zones: Richmond, VA (DOM zone, ZIP
+      232xx) and Chicago, IL (ComEd zone, ZIP 606xx). every other ZIP
+      returns the literal sentinel below.
     </p>
     <p>
       computation runs entirely in this browser tab. nothing is sent to a
@@ -81,7 +82,7 @@ const years = [...VALID_YEARS];
           maxlength="5"
           id="zip"
           name="zip"
-          placeholder="23219"
+          placeholder="23219 or 60601"
         />
       </label>
       <label>
@@ -153,7 +154,7 @@ const years = [...VALID_YEARS];
         }
         if (r.kind === "out_of_coverage") {
           out.textContent =
-            "outside v0.1 coverage (one PJM zone, DOM, supported).";
+            "outside v0.2 coverage (PJM DOM and ComEd zones supported).";
           return;
         }
         out.textContent =

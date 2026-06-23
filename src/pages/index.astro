@@ -1,0 +1,48 @@
+---
+import { ZIP_TO_LDA } from "../lib/bill_delta";
+
+const coverage = Object.entries(ZIP_TO_LDA)
+  .map(([prefix, lda]) => `${prefix}xx → ${lda}`)
+  .join(", ");
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ratepayer exposure</title>
+    <meta
+      name="description"
+      content="per-customer bill-delta from data-center load growth in PJM, 2026-2030, every number cited"
+    />
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        max-width: 42rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+        color: #111;
+      }
+      h1 { font-weight: 600; font-size: 1.5rem; }
+      ul { padding-left: 1.25rem; }
+      a { color: #225; }
+      .coverage { font-size: 0.9rem; color: #444; }
+    </style>
+  </head>
+  <body>
+    <h1>ratepayer exposure</h1>
+    <p>
+      for a US ratepayer in a covered PJM zone, estimate how much of the
+      2026-2030 electricity-bill increase is attributable to data-center
+      load growth, given current cost-allocation rules. every output
+      number renders with a source URL.
+    </p>
+    <ul>
+      <li><a href="/calculator/">calculator</a> — enter a ZIP and a year</li>
+      <li><a href="/methodology/">methodology</a> — formula, assumptions, sources</li>
+    </ul>
+    <p class="coverage">v0.2 coverage: {coverage}.</p>
+  </body>
+</html>

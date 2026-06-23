@@ -37,6 +37,12 @@ COST_ALLOCATION: dict[str, CostAllocation] = {
         typical_residential_kwh_per_year=14000.0,
         baseline_usd_per_year=1800.0,
     ),
+    "COMED": CostAllocation(
+        data_center_load_share=0.12,
+        residential_allocation_share=0.035,
+        typical_residential_kwh_per_year=8500.0,
+        baseline_usd_per_year=1140.0,
+    ),
 }
 
 # capacity_price_delta_usd_per_mw_day, per (zone, year)
@@ -47,6 +53,13 @@ LDA_RATES: dict[str, dict[int, float]] = {
         2028: 55.0,
         2029: 80.0,
         2030: 110.0,
+    },
+    "COMED": {
+        2026: 15.0,
+        2027: 28.0,
+        2028: 45.0,
+        2029: 65.0,
+        2030: 90.0,
     },
 }
 

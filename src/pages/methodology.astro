@@ -4,11 +4,11 @@ import {
   PJM_LDA_RATES,
   VALID_YEARS,
   ZIP_TO_LDA,
+  type LdaCode,
 } from "../lib/bill_delta";
 
-const dom = COST_ALLOCATION.DOM;
-const domRates = PJM_LDA_RATES.DOM;
 const years = [...VALID_YEARS];
+const ldas: LdaCode[] = ["DOM", "COMED"];
 
 type Assumption = {
   name: string;
@@ -18,38 +18,44 @@ type Assumption = {
   last_verified: string;
 };
 
-const assumptions: Assumption[] = [
-  {
-    name: "data_center_load_share (DOM)",
-    value: dom.data_center_load_share.toString(),
-    tag: "median",
-    source_url: dom.source_url,
-    last_verified: dom.last_verified,
-  },
-  {
-    name: "residential_allocation_share (DOM)",
-    value: dom.residential_allocation_share.toString(),
-    tag: "conservative",
-    source_url: dom.source_url,
-    last_verified: dom.last_verified,
-  },
-  {
-    name: "typical_residential_kwh_per_year (DOM)",
-    value: dom.typical_residential_kwh_per_year.toString() + " kWh",
-    tag: "median",
-    source_url:
-      "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf",
-    last_verified: dom.last_verified,
-  },
-  {
-    name: "baseline_usd_per_year (DOM)",
-    value: "$" + dom.baseline_usd_per_year.toString(),
-    tag: "median",
-    source_url:
-      "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf",
-    last_verified: dom.last_verified,
-  },
-];
+const EIA_TABLE5A =
+  "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf";
+
+function assumptionsFor(lda: LdaCode): Assumption[] {
+  const c = COST_ALLOCATION[lda];
+  return [
+    {
+      name: `data_center_load_share (${lda})`,
+      value: c.data_center_load_share.toString(),
+      tag: "median",
+      source_url: c.source_url,
+      last_verified: c.last_verified,
+    },
+    {
+      name: `residential_allocation_share (${lda})`,
+      value: c.residential_allocation_share.toString(),
+      tag: "conservative",
+      source_url: c.source_url,
+      last_verified: c.last_verified,
+    },
+    {
+      name: `typical_residential_kwh_per_year (${lda})`,
+      value: c.typical_residential_kwh_per_year.toString() + " kWh",
+      tag: "median",
+      source_url: EIA_TABLE5A,
+      last_verified: c.last_verified,
+    },
+    {
+      name: `baseline_usd_per_year (${lda})`,
+      value: "$" + c.baseline_usd_per_year.toString(),
+      tag: "median",
+      source_url: EIA_TABLE5A,
+      last_verified: c.last_verified,
+    },
+  ];
+}
+
+const assumptions: Assumption[] = ldas.flatMap(assumptionsFor);
 ---
 
 <!doctype html>
@@ -129,12 +135,14 @@ baseline_usd(zone) = static field on the cost_allocation record
       hand-computed values.
     </p>
 
-    <h2>v0.1 coverage</h2>
+    <h2>v0.2 coverage</h2>
     <p>
-      one PJM LDA zone (Dominion / DOM) and one ZIP prefix
-      ({Object.keys(ZIP_TO_LDA).join(", ")} → DOM). every other ZIP
-      returns the sentinel "outside v0.1 coverage". widening lands in
-      spec 0004 (DOM ZIP coverage) and spec 0005 (other PJM zones).
+      two PJM LDA zones, each keyed by one ZIP-3 prefix:
+      {Object.entries(ZIP_TO_LDA)
+        .map(([prefix, lda]) => `${prefix} → ${lda}`)
+        .join(", ")}. every other ZIP returns the sentinel "outside v0.2
+      coverage". widening each zone's ZIP footprint lands in spec 0004;
+      more PJM zones in spec 0005.
     </p>
 
     <h2>assumptions (DEC-001 charter)</h2>
@@ -168,29 +176,37 @@ baseline_usd(zone) = static field on the cost_allocation record
       </tbody>
     </table>
 
-    <h2>DOM zone capacity-price deltas, 2026-2030</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>year</th>
-          <th>capacity price delta ($/MW-day)</th>
-          <th>source</th>
-          <th>retrieved</th>
-          <th>last verified</th>
-        </tr>
-      </thead>
-      <tbody>
-        {years.map((y) => (
-          <tr>
-            <td>{y}</td>
-            <td>${domRates[y].capacity_price_delta_usd_per_mw_day}</td>
-            <td><a href={domRates[y].source_url} rel="noopener">source</a></td>
-            <td>{domRates[y].retrieved_iso}</td>
-            <td>{domRates[y].last_verified}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    {ldas.map((lda) => (
+      <>
+        <h2>{lda} zone capacity-price deltas, 2026-2030</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>year</th>
+              <th>capacity price delta ($/MW-day)</th>
+              <th>source</th>
+              <th>retrieved</th>
+              <th>last verified</th>
+            </tr>
+          </thead>
+          <tbody>
+            {years.map((y) => (
+              <tr>
+                <td>{y}</td>
+                <td>${PJM_LDA_RATES[lda][y].capacity_price_delta_usd_per_mw_day}</td>
+                <td>
+                  <a href={PJM_LDA_RATES[lda][y].source_url} rel="noopener">
+                    source
+                  </a>
+                </td>
+                <td>{PJM_LDA_RATES[lda][y].retrieved_iso}</td>
+                <td>{PJM_LDA_RATES[lda][y].last_verified}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </>
+    ))}
 
     <h2>sanity bound</h2>
     <p>
@@ -221,7 +237,7 @@ baseline_usd(zone) = static field on the cost_allocation record
         spec 0003.
       </li>
       <li>
-        additional PJM zones beyond DOM — spec 0005.
+        additional PJM zones beyond DOM and ComEd — spec 0005.
       </li>
       <li>
         ISOs beyond PJM, commercial / industrial bills — out of scope
