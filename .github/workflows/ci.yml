@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: install dependencies
+        run: npm install
+
+      - name: test
+        run: npm test
+
+      - name: check-bounds
+        run: npm run check:bounds
+
+      - name: check-stale-data
+        run: npm run check:stale-data
+
+      - name: build
+        run: npm run build
