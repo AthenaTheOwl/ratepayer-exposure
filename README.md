@@ -1,25 +1,28 @@
-# RatepayerExposure
+# ratepayer-exposure
 
-For a US ratepayer in a covered PJM zone, estimate how much of their
-electricity bill increase over 2026-2030 is attributable to data-center
-load growth in their utility / ISO, given current cost-allocation rules.
+Type a Richmond ZIP into the calculator and ask it about 2030. It says $2,248 a
+year, on a bill that today runs $1,800. The data-center share of the increase has
+quietly grown larger than the whole bill you currently pay. Every digit of that
+number carries a source URL.
 
-## What this is
+## What it does
 
-A small public calculator with a long methodology page. The user enters
-a ZIP code and a year (2026-2030); the calculator returns a projected
-annual bill delta attributable to data-center load, with every
-assumption cited. Computation runs entirely client-side — no ZIP code is
-sent to a server or logged.
+Data centers don't pay the capacity bill alone. The cost of keeping enough
+generation on standby for them gets spread across a PJM zone's cost-allocation
+pool, and a slice of that slice lands on residential customers who never asked for
+the load. This calculator estimates that slice for one household. Enter a ZIP and a
+year between 2026 and 2030; it returns the projected annual bill delta attributable
+to data-center load growth, with every assumption behind it cited.
 
-The repo's discipline is that no number renders without a source. The
-methodology page lists every assumption, its source URL, and the
-sanity-bound check that rejects any version where the delta exceeds 2x
-of baseline (the bound enforced by `eval/sanity_bounds.py` and the
-vitest suite from both sides).
+The whole computation runs client-side. No ZIP code is sent anywhere or logged —
+the model and its data are inlined in `src/lib/bill_delta.ts`, so the page does the
+arithmetic in front of you with no fetch.
 
-This repo is downstream of InterconnectAlpha (capacity-price curves) and
-GridSilicon (site data). It is upstream of nothing.
+The discipline is that no number renders without a source. The methodology page
+lists every assumption, its source URL, and a sanity bound that rejects any version
+where the delta exceeds 2x the baseline bill. That bound is checked twice, from two
+independent implementations — `eval/sanity_bounds.py` in Python and the vitest suite
+in TypeScript — so a constant that drifts on one side gets caught on the other.
 
 ## Coverage
 
@@ -30,10 +33,10 @@ v0.2 covers two PJM LDA zones, each keyed by one ZIP-3 prefix:
 | `DOM` | Dominion Energy Virginia | `232xx` | `23219` (Richmond, VA) |
 | `COMED` | Commonwealth Edison | `606xx` | `60601` (Chicago, IL) |
 
-Every other ZIP returns the literal sentinel "outside v0.2 coverage".
-Widening each zone's ZIP footprint lands in spec 0004; more PJM zones in
-spec 0005. ISOs beyond PJM and commercial / industrial bills are out of
-scope (see `AGENTS.md`).
+Every other ZIP returns the literal sentinel "outside v0.2 coverage" — it would
+rather say nothing than guess. Widening each zone's ZIP footprint lands in spec
+0004; more PJM zones in spec 0005. ISOs beyond PJM and commercial / industrial bills
+are out of scope (see `AGENTS.md`).
 
 ## How to run
 
@@ -63,6 +66,20 @@ Deploy steps:
    `dist/`) and click **Deploy**
 
 <!-- live-url: https://__________.vercel.app -->
+
+## How it connects
+
+This sits at the household end of the same buildout the other repos measure
+upstream:
+
+- [interconnect-alpha](https://github.com/AthenaTheOwl/interconnect-alpha) — the
+  capacity-price curves that feed the per-MW-day deltas this calculator multiplies
+  through.
+- [grid-silicon](https://github.com/AthenaTheOwl/grid-silicon) — the site data
+  underneath the load growth that drives those curves.
+
+The chain ends here: a number on one person's power bill. Nothing is downstream of
+the bill.
 
 ## Layout
 
@@ -101,8 +118,7 @@ MIT. See LICENSE.
 
 ## Caveat
 
-This is the kind of artifact that gets attacked by utility lobbying
-shops. The PJM zones must be bulletproof or the work is discredited.
-Discipline is the differentiator: every output number cites a source,
-every assumption is named and tagged, every bound is checked from two
-independent implementations.
+This is the kind of artifact a utility lobbying shop will go looking for cracks in.
+The two PJM zones have to hold, or the work is discredited the moment it's
+inconvenient. So every output number cites a source, every assumption is named and
+tagged, and every bound is checked from two implementations that don't share code.
