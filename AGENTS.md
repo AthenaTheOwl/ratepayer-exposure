@@ -30,17 +30,23 @@ Not all roles are implemented in v0.
 - Every output number renders with an inline `[n]` citation linking to
   a footnote with the source URL and retrieval date.
 
-## Gates (will land in spec 0002)
+## Gates
+
+Built and running in CI (`.github/workflows/ci.yml`):
 
 ```bash
-npm run check:voice           # banned terms scan
-npm run check:citations       # every numeric output has a citation
-npm run check:bounds          # sanity bounds (no delta > 200%)
-npm run check:a11y            # axe-core
-npm run build                 # production build succeeds
+npm test                      # vitest
+npm run check:bounds          # python eval/sanity_bounds.py — no delta > 200%
+npm run check:stale-data      # node scripts/check_stale_data.mjs
+npm run build                 # astro build succeeds
 ```
 
-A page that emits an uncited number fails the citations gate.
+Planned, not built: `check:voice` (banned terms scan),
+`check:citations` (every numeric output carries an inline `[n]`
+citation), and `check:a11y` (axe-core). The citation rule under Voice
+constraints is stated policy; until `check:citations` exists, an
+uncited number is caught in review, not by a gate. Do not cite these
+three as if they run.
 
 ## Out of scope
 
