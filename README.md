@@ -122,3 +122,7 @@ This is the kind of artifact a utility lobbying shop will go looking for cracks 
 The two PJM zones have to hold, or the work is discredited the moment it's
 inconvenient. So every output number cites a source, every assumption is named and
 tagged, and every bound is checked from two implementations that don't share code.
+
+## Method update
+
+[October method update: A capacity price is upstream of a household bill](docs/tariff-incidence-review.md).
