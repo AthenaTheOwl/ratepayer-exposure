@@ -93,22 +93,23 @@ export const ZIP_TO_LDA: ZipToLdaMap = {
 // price ($28.92/MW-day system-wide). DOM zonal deltas extrapolate the
 // 2025/2026 BRA result (cleared $444.26/MW-day in DOM) forward through
 // 2030 under PJM's published load-forecast curve. tagged conservative
-// in DEC-001; see methodology page for the calibration note.
+// in DEC-001; DEC-002 (open) notes how far they sit below the 2026/27
+// and 2027/28 cleared prices.
 export const PJM_LDA_RATES: Record<LdaCode, Record<BillDeltaYear, LdaRateRecord>> = {
   DOM: {
     2026: {
       capacity_price_delta_usd_per_mw_day: 20,
       source_url:
-        "https://insidelines.pjm.com/pjm-capacity-auction-procures-resources-to-meet-growing-demand/",
-      retrieved_iso: "2026-06-20",
-      last_verified: "2026-06-20",
+        "https://insidelines.pjm.com/pjm-capacity-auction-procures-sufficient-resources-to-meet-rto-reliability-requirement/",
+      retrieved_iso: "2026-10-19",
+      last_verified: "2026-10-19",
     },
     2027: {
       capacity_price_delta_usd_per_mw_day: 35,
       source_url:
-        "https://insidelines.pjm.com/pjm-capacity-auction-procures-resources-to-meet-growing-demand/",
-      retrieved_iso: "2026-06-20",
-      last_verified: "2026-06-20",
+        "https://insidelines.pjm.com/pjm-capacity-auction-procures-sufficient-resources-to-meet-rto-reliability-requirement/",
+      retrieved_iso: "2026-10-19",
+      last_verified: "2026-10-19",
     },
     2028: {
       capacity_price_delta_usd_per_mw_day: 55,
@@ -133,24 +134,26 @@ export const PJM_LDA_RATES: Record<LdaCode, Record<BillDeltaYear, LdaRateRecord>
     },
   },
   // COMED zonal deltas extrapolate the 2025/2026 BRA result (cleared
-  // $329.17/MW-day in ComEd) forward through 2030 under PJM's published
-  // load-forecast curve. tagged conservative in DEC-001; values stay
-  // below the cleared ComEd zonal delta so the formula does not
-  // overstate exposure.
+  // $269.92/MW-day in ComEd, the rest-of-RTO price) forward through
+  // 2030 under PJM's published load-forecast curve. ($329.17/MW-day is
+  // the 2026/2027 BRA price, which cleared at the cap across the whole
+  // PJM footprint, ComEd included.) tagged conservative in DEC-001;
+  // values stay below the cleared ComEd zonal delta so the formula does
+  // not overstate exposure.
   COMED: {
     2026: {
       capacity_price_delta_usd_per_mw_day: 15,
       source_url:
-        "https://insidelines.pjm.com/pjm-capacity-auction-procures-resources-to-meet-growing-demand/",
-      retrieved_iso: "2026-06-22",
-      last_verified: "2026-06-22",
+        "https://insidelines.pjm.com/pjm-capacity-auction-procures-sufficient-resources-to-meet-rto-reliability-requirement/",
+      retrieved_iso: "2026-10-19",
+      last_verified: "2026-10-19",
     },
     2027: {
       capacity_price_delta_usd_per_mw_day: 28,
       source_url:
-        "https://insidelines.pjm.com/pjm-capacity-auction-procures-resources-to-meet-growing-demand/",
-      retrieved_iso: "2026-06-22",
-      last_verified: "2026-06-22",
+        "https://insidelines.pjm.com/pjm-capacity-auction-procures-sufficient-resources-to-meet-rto-reliability-requirement/",
+      retrieved_iso: "2026-10-19",
+      last_verified: "2026-10-19",
     },
     2028: {
       capacity_price_delta_usd_per_mw_day: 45,
