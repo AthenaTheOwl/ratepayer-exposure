@@ -31,7 +31,7 @@ for (const [prefix, lda] of Object.entries(ZIP_TO_LDA)) {
   }
 }
 
-process.stdout.write(
+console.log(
   JSON.stringify({
     zip_zones: [...new Set(Object.values(ZIP_TO_LDA))],
     rate_zones: Object.keys(PJM_LDA_RATES),
