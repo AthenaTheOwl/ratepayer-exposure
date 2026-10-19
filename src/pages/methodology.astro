@@ -252,11 +252,32 @@ baseline_usd(zone) = static field on the cost_allocation record
 
     <h2>sanity bound</h2>
     <p>
-      <code>eval/sanity_bounds.py</code> walks every covered (zone,
-      year) and asserts <code>delta_usd / baseline_usd &lt;= 2.0</code>.
+      <code>eval/sanity_bounds.py</code> runs the same model the
+      calculator ships (it does not keep a second copy of the formula)
+      and, for every covered (zone, year), asserts:
+    </p>
+    <ul>
+      <li><code>delta_usd / baseline_usd &lt;= 2.0</code>;</li>
+      <li>
+        <code>delta_usd &lt;= price × 365 × household_plc_mw</code>: the
+        data-center slice stays within the household's whole
+        capacity-charge change;
+      </li>
+      <li>
+        each PLC is 0.5-10 kW with an implied load factor (annual kWh ÷
+        8,760 ÷ PLC kW) of 0.25-1.0, so an energy figure entered as a
+        capacity figure fails;
+      </li>
+      <li>
+        the ComEd PLC, priced at the 2025/26 ComEd change ($269.92 −
+        $28.92 per MW-day), lands within 0.5x-2x of ComEd's published
+        ~$10.60/month residential increase.
+      </li>
+    </ul>
+    <p>
       a violation either means a real edge case (which must be called
       out here) or a bug (which must be fixed before the build can
-      ship). v0.1 wires this as <code>npm run check:bounds</code>.
+      ship). CI runs it as <code>npm run check:bounds</code>.
     </p>
 
     <h2>what v0.1 does not cover (deferred to spec 0003+)</h2>
