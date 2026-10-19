@@ -10,4 +10,4 @@ The next proposed fixture holds household consumption constant while varying onl
 
 ## References
 
-- https://www.ferc.gov/explainer-interconnection-final-rule
+- PJM Manual 18: PJM Capacity Market, Rev. 63, sections 1.2.1 and 7.4–7.5: an LSE's Locational Reliability Charge is its Daily Unforced Capacity Obligation (MW, built from customer Peak Load Contributions) multiplied by the Final Zonal Capacity Price ($/MW-day). https://www.pjm.com/-/media/documents/manuals/m18.ashx (retrieved 2026-10-19)
