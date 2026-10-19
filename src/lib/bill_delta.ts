@@ -5,15 +5,20 @@
 // formula (also rendered on /methodology/):
 //
 //   delta_usd(zone, year) =
-//       capacity_price_delta_usd_per_mw_day(zone, year)
-//     * 365
-//     * residential_allocation_share(zone)
-//     * data_center_load_share(zone)
-//     * typical_residential_kwh_per_year(zone)
-//     / 1000   # kWh -> MWh, so the result lands in USD/year per customer
+//       capacity_price_delta_usd_per_mw_day(zone, year)   # USD / MW-day
+//     * 365                                               # day / year
+//     * household_plc_mw(zone)                            # MW of capacity obligation
+//     * data_center_load_share(zone)                      # dimensionless
+//                                                         # = USD / year per customer
 //
-// see decisions/DEC-001-assumption-charter.md for every assumption
-// tagged conservative / median / upper-bound.
+// a capacity price is charged per MW of capacity obligation. PJM
+// Manual 18 bills an LSE its UCAP obligation, built from customer peak
+// load contributions (PLC), times the zonal price. annual kWh is energy
+// and enters only through the documented PLC derivation.
+//
+// see decisions/DEC-002-capacity-obligation.md (which supersedes the
+// DEC-001 formula and calibration) for every assumption tagged
+// conservative / median / upper-bound.
 
 export type BillDeltaYear = 2026 | 2027 | 2028 | 2029 | 2030;
 
@@ -56,9 +61,12 @@ export type LdaRateRecord = {
 
 export type CostAllocationRecord = {
   data_center_load_share: number;
-  residential_allocation_share: number;
+  data_center_load_share_source_url: string;
+  household_plc_mw: number;
+  household_plc_source_url: string;
   typical_residential_kwh_per_year: number;
   baseline_usd_per_year: number;
+  // source for typical_residential_kwh_per_year and baseline_usd_per_year.
   source_url: string;
   retrieved_iso: string;
   last_verified: string;
@@ -168,47 +176,57 @@ export const PJM_LDA_RATES: Record<LdaCode, Record<BillDeltaYear, LdaRateRecord>
   },
 };
 
-// cost-allocation parameters for DOM. each value is tagged in DEC-001.
-// the shares multiply, so all three together act as an "attributable to
-// data centers, allocated to residential, multiplied by this customer's
-// usage" filter on the raw capacity-cost delta.
+const EIA_TABLE_5A =
+  "https://www.eia.gov/electricity/sales_revenue_price/pdf/table_5A.pdf";
+const IMM_2026_27_BRA_PART_A =
+  "https://www.monitoringanalytics.com/reports/Reports/2025/IMM_Analysis_of_the_20262027_RPM_Base_Residual_Auction_Part_A_20251001.pdf";
+const DEC_002 =
+  "https://github.com/AthenaTheOwl/ratepayer-exposure/blob/main/decisions/DEC-002-capacity-obligation.md";
+
+// per-zone household inputs. each value is tagged in DEC-002.
+//   household_plc_mw       -- the household's capacity obligation (peak
+//                             load contribution), MW. assumption, derived
+//                             as annual kWh / 8,760 h / 0.5, where 0.5 is
+//                             an assumed residential load factor at PJM's
+//                             five summer coincident peaks. no published
+//                             Dominion or ComEd residential PLC was found.
+//   data_center_load_share -- share of the capacity-price delta attributed
+//                             to data-center load. assumption; the PJM
+//                             market monitor attributes 45.1% of 2026/27
+//                             BRA revenues to data-center load, so these
+//                             values sit well below the published figure.
+//   typical_residential_kwh_per_year, baseline_usd_per_year -- EIA
+//                             Table 5A (2024 data), monthly figure x 12.
 export const COST_ALLOCATION: Record<LdaCode, CostAllocationRecord> = {
   DOM: {
-    // share of incremental PJM capacity demand growth attributable to
-    // data-center load in the DOM zone. median value across published
-    // PJM load forecasts for 2026-2030.
     data_center_load_share: 0.10,
-    // residential customers' share of the zonal cost-allocation pool,
-    // calibrated to roll up to typical observed residential bill impact
-    // (~$10-20/month) at the 2025/2026 cleared price. tagged conservative.
-    residential_allocation_share: 0.04,
-    // typical Virginia residential annual usage. EIA 2022 figure for VA.
-    typical_residential_kwh_per_year: 14000,
-    // typical Virginia residential annual bill (~$150/month).
-    baseline_usd_per_year: 1800,
-    source_url:
-      "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf",
-    retrieved_iso: "2026-06-20",
-    last_verified: "2026-06-20",
+    data_center_load_share_source_url: IMM_2026_27_BRA_PART_A,
+    // 12,384 kWh / 8,760 h / 0.5 = 2.83 kW, rounded to 2.8 kW.
+    household_plc_mw: 0.0028,
+    household_plc_source_url: DEC_002,
+    // Virginia: 1,032 kWh/month x 12.
+    typical_residential_kwh_per_year: 12384,
+    // Virginia: $148.77/month x 12.
+    baseline_usd_per_year: 1785.24,
+    source_url: EIA_TABLE_5A,
+    retrieved_iso: "2026-10-19",
+    last_verified: "2026-10-19",
   },
-  // cost-allocation parameters for COMED. each value tagged in DEC-001.
   COMED: {
-    // share of incremental PJM capacity demand growth attributable to
-    // data-center load in the ComEd zone. Northern Illinois carries a
-    // large and growing data-center cluster; median across published
-    // PJM load forecasts for 2026-2030.
     data_center_load_share: 0.12,
-    // residential customers' share of the zonal cost-allocation pool,
-    // calibrated to observed ComEd residential bill impact. conservative.
-    residential_allocation_share: 0.035,
-    // typical Illinois residential annual usage. EIA 2022 figure for IL.
-    typical_residential_kwh_per_year: 8500,
-    // typical Illinois residential annual bill (~$95/month).
-    baseline_usd_per_year: 1140,
-    source_url:
-      "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf",
-    retrieved_iso: "2026-06-22",
-    last_verified: "2026-06-22",
+    data_center_load_share_source_url: IMM_2026_27_BRA_PART_A,
+    // 8,316 kWh / 8,760 h / 0.5 = 1.90 kW, rounded to 1.9 kW. ComEd's
+    // published ~$10.60/month residential increase from the 2025/26
+    // auction implies ~1.45 kW, so this value runs high (upper-bound).
+    household_plc_mw: 0.0019,
+    household_plc_source_url: DEC_002,
+    // Illinois: 693 kWh/month x 12.
+    typical_residential_kwh_per_year: 8316,
+    // Illinois: $109.99/month x 12.
+    baseline_usd_per_year: 1319.88,
+    source_url: EIA_TABLE_5A,
+    retrieved_iso: "2026-10-19",
+    last_verified: "2026-10-19",
   },
 };
 
@@ -249,13 +267,13 @@ export function billDelta(input: BillDeltaInput): BillDeltaResult {
     return { kind: "out_of_coverage", zip: input.zip };
   }
 
+  // USD/MW-day x day/yr x MW x share = USD/yr. annual kWh only feeds
+  // the PLC derivation documented in DEC-002.
   const delta_usd =
-    (rate.capacity_price_delta_usd_per_mw_day *
-      365 *
-      cost.residential_allocation_share *
-      cost.data_center_load_share *
-      cost.typical_residential_kwh_per_year) /
-    1000;
+    rate.capacity_price_delta_usd_per_mw_day *
+    365 *
+    cost.household_plc_mw *
+    cost.data_center_load_share;
 
   return {
     kind: "ok",
@@ -264,6 +282,11 @@ export function billDelta(input: BillDeltaInput): BillDeltaResult {
     year: input.year,
     delta_usd: Math.round(delta_usd * 100) / 100,
     baseline_usd: cost.baseline_usd_per_year,
-    sources: [rate.source_url, cost.source_url],
+    sources: [
+      rate.source_url,
+      cost.household_plc_source_url,
+      cost.data_center_load_share_source_url,
+      cost.source_url,
+    ],
   };
 }
