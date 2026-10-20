@@ -185,7 +185,7 @@ baseline_usd(zone) = static field on the cost_allocation record
       more PJM zones in spec 0005.
     </p>
 
-    <h2>assumptions (DEC-001 charter, DEC-002 revision)</h2>
+    <h2>assumptions (DEC-001 charter, DEC-002 and DEC-003 revisions)</h2>
     <p>
       every assumption used by <code>billDelta()</code> appears in the
       table below with its tag, its basis and a source URL. the tag
@@ -226,30 +226,67 @@ baseline_usd(zone) = static field on the cost_allocation record
           <thead>
             <tr>
               <th>year</th>
-              <th>capacity price delta ($/MW-day)</th>
+              <th>PJM delivery year</th>
+              <th>BRA price ($/MW-day)</th>
+              <th>less 2024/25 baseline</th>
+              <th>delta ($/MW-day)</th>
+              <th>basis</th>
+              <th>tag</th>
               <th>source</th>
-              <th>retrieved</th>
               <th>last verified</th>
             </tr>
           </thead>
           <tbody>
-            {years.map((y) => (
-              <tr>
-                <td>{y}</td>
-                <td>${PJM_LDA_RATES[lda][y].capacity_price_delta_usd_per_mw_day}</td>
-                <td>
-                  <a href={PJM_LDA_RATES[lda][y].source_url} rel="noopener">
-                    source
-                  </a>
-                </td>
-                <td>{PJM_LDA_RATES[lda][y].retrieved_iso}</td>
-                <td>{PJM_LDA_RATES[lda][y].last_verified}</td>
-              </tr>
-            ))}
+            {years.map((y) => {
+              const r = PJM_LDA_RATES[lda][y];
+              return (
+                <tr>
+                  <td>{y}</td>
+                  <td>{r.delivery_year}</td>
+                  <td>${r.capacity_price_usd_per_mw_day.toFixed(2)}</td>
+                  <td>
+                    <a href={r.baseline_source_url} rel="noopener">
+                      ${r.baseline_price_usd_per_mw_day.toFixed(2)}
+                    </a>
+                  </td>
+                  <td>${r.capacity_price_delta_usd_per_mw_day.toFixed(2)}</td>
+                  <td>{r.price_basis === "cleared" ? "cleared BRA price" : "assumption"}</td>
+                  <td><span class={`tag ${r.tag}`}>{r.tag}</span></td>
+                  <td>
+                    <a href={r.source_url} rel="noopener">source</a>
+                  </td>
+                  <td>{r.last_verified}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </>
     ))}
+
+    <h2>capacity prices (DEC-003)</h2>
+    <p>
+      year N means PJM delivery year N/N+1 (June 1, N to May 31, N+1).
+      the price is the zone's Base Residual Auction resource clearing
+      price; the delta subtracts the same zone's 2024/2025 BRA price,
+      $28.92/MW-day, the last auction before the data-center-driven
+      increase. the 2026/27, 2027/28 and 2028/29 auctions cleared at
+      the price cap in every zone, DOM and ComEd included ($329.17,
+      $333.44, $325.00), so both zones carry the same prices.
+    </p>
+    <p>
+      2029 and 2030 have no auction result. 2029 uses the posted
+      2029/2030 cap ($337.83), the most that auction can clear at
+      (upper-bound). 2030 carries the same figure forward; the price
+      collar ends with 2029/2030, and PJM's no-cap simulations of the
+      last three auctions cleared at $388.57 to $776.69, so a flat
+      $337.83 is tagged conservative. both are assumptions.
+      the BRA price is not the final zonal price a utility pays after
+      incremental auctions, and how the charge reaches a retail tariff
+      is not modelled.
+      <a href="https://github.com/AthenaTheOwl/ratepayer-exposure/blob/main/decisions/DEC-003-cleared-bra-prices.md" rel="noopener">DEC-003</a>
+      records the change from the earlier $15-$110 fixture values.
+    </p>
 
     <h2>sanity bound</h2>
     <p>

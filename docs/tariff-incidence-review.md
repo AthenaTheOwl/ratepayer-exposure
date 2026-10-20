@@ -10,6 +10,8 @@ The next proposed fixture holds household consumption constant while varying onl
 
 Follow-up, October 19, 2026: [DEC-002](../decisions/DEC-002-capacity-obligation.md) replaces the kWh term with a stated household capacity obligation (PLC, MW) and removes the residential allocation share, so the consumption-based fixture plan above no longer applies. The named-tariff check this note asks for is still open: DEC-002 does not model how PJM capacity prices reach a Virginia residential bill, so the calculator's figures remain scenario calculations.
 
+Follow-up, October 20, 2026: [DEC-003](../decisions/DEC-003-cleared-bra-prices.md) replaces the fixture capacity prices with PJM Base Residual Auction clearing prices for 2026/27-2028/29 ($329.17, $333.44, $325.00/MW-day in both zones) and tagged assumptions for 2029/30-2030/31, each less the $28.92 2024/25 price. The figures are still scenario calculations; the named-tariff check remains open.
+
 ## References
 
 - PJM Manual 18: PJM Capacity Market, Rev. 63, sections 1.2.1 and 7.4–7.5: an LSE's Locational Reliability Charge is its Daily Unforced Capacity Obligation (MW, built from customer Peak Load Contributions) multiplied by the Final Zonal Capacity Price ($/MW-day). https://www.pjm.com/-/media/DotCom/documents/manuals/m18.ashx (retrieved 2026-10-19)

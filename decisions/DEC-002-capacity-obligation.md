@@ -127,7 +127,9 @@ Baselines: DOM $1,800 to $1,785.24; COMED $1,140 to $1,319.88.
 
 ## open
 
-- The price rows are unchanged and stay `conservative`. They sit far
+- Resolved 2026-10-20 by [DEC-003](DEC-003-cleared-bra-prices.md),
+  which replaces the price rows with cleared BRA prices. As written
+  on 2026-10-19: the price rows are unchanged and stay `conservative`. They sit far
   below prices that have already cleared: the 2026/27 BRA cleared at
   the $329.17/MW-day cap across the whole PJM footprint and the 2027/28
   BRA at $333.44, changes of $300.25 and $304.52 over the $28.92 base,
@@ -146,4 +148,5 @@ Baselines: DOM $1,800 to $1,785.24; COMED $1,140 to $1,319.88.
 
 | date | change |
 |---|---|
+| 2026-10-20 | Price open item resolved by DEC-003. The before / after table above shows DEC-002's figures at the old price rows. |
 | 2026-10-19 | DEC-002 — capacity-obligation formula; `residential_allocation_share` removed; `household_plc_mw` added; share re-tagged `conservative`; EIA inputs re-cited to the 2024 table; bounds check runs the shipped model. |
