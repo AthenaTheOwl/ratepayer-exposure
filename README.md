@@ -28,8 +28,9 @@ lists every assumption, its source URL or its basis as an assumption, and the sa
 bounds: the delta may not exceed 2x the baseline bill, and the data-center slice may
 not exceed the household's whole capacity-charge change. The vitest suite checks
 them in TypeScript. `eval/sanity_bounds.py` runs the shipped model and checks them
-again in Python without a copy of the formula, so a units error in the formula
-itself trips the capacity-charge ceiling.
+again in Python without a copy of the formula, so a formula error large enough to
+exceed the household's whole capacity charge (about 10x at current shares) trips
+the ceiling; the pinned vitest reference values catch smaller ones.
 
 ## Coverage
 
@@ -135,5 +136,5 @@ MIT. See LICENSE.
 This is the kind of artifact a utility lobbying shop will go looking for cracks in.
 The two PJM zones have to hold, or the work is discredited the moment it's
 inconvenient. So every output number cites a source, every assumption is named and
-tagged, and every bound is checked twice, once by a script that runs the shipped
-model without sharing its formula.
+tagged, and every bound is checked by a script that runs the shipped model without
+sharing its formula; the ratio, ceiling and PLC bounds are also pinned in vitest.
