@@ -70,7 +70,11 @@ average residential bill by about $10.60 a month
 At the 2025/26 ComEd price change of $241.00/MW-day ($269.92 - $28.92)
 that implies about 1.45 kW. The 1.9 kW used here gives $167.13 a year
 against ComEd's $127.20, 1.31x. The COMED row is tagged `upper-bound`.
-The DOM row has no published comparison and is tagged `median`.
+The DOM row has no published comparison and is tagged `median`. Here
+`median` means only that no direction of bias is established; it
+departs from the DEC-001 definition ("the central value of published
+estimates"), since no published estimate exists. The value is
+unanchored.
 
 `data_center_load_share`. DEC-001 cited this to a PJM 2026 load
 forecast, and the methodology page linked the EIA table instead.
@@ -117,7 +121,7 @@ Check 2 fails the DEC-001 formula by about 20x.
 | COMED | 2027 | $364.85 | $2.33 | $19.42 |
 | COMED | 2028 | $586.37 | $3.74 | $31.21 |
 | COMED | 2029 | $846.98 | $5.41 | $45.08 |
-| COMED | 2030 | $1,172.74 | $7.49 | $62.42 |
+| COMED | 2030 | $1,172.74 | $7.49 | $62.41 |
 
 Baselines: DOM $1,800 to $1,785.24; COMED $1,140 to $1,319.88.
 
