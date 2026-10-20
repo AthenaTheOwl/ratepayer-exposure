@@ -105,8 +105,9 @@ describe("billDelta — COMED reference cases", () => {
 // (MW). the v0.2 formula multiplied it by annual energy (kWh / 1000), so
 // a home that used twice the energy at the same peak paid twice the
 // capacity charge, and the "data-center share" ran ~20x the household's
-// whole capacity-charge delta (DOM 2030: $2,248 vs ~$112). these cases
-// fail on that formula.
+// whole capacity-charge delta (DOM 2030: $2,248 vs ~$112). the first
+// two cases fail on that formula; the third checks the PLC input itself
+// and guards against a units slip there (a PLC entered in kW as MW).
 type Lda = keyof typeof COST_ALLOCATION;
 type Year = 2026 | 2027 | 2028 | 2029 | 2030;
 
