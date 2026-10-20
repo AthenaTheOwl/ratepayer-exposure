@@ -17,8 +17,9 @@
 // and enters only through the documented PLC derivation.
 //
 // see decisions/DEC-002-capacity-obligation.md (which supersedes the
-// DEC-001 formula and calibration) for every assumption tagged
-// conservative / median / upper-bound.
+// DEC-001 formula and calibration) and decisions/DEC-003-cleared-bra-prices.md
+// (which replaces the DEC-001 price rows with cleared BRA prices) for
+// every assumption tagged conservative / median / upper-bound.
 
 export type BillDeltaYear = 2026 | 2027 | 2028 | 2029 | 2030;
 
@@ -52,9 +53,25 @@ export type BillDeltaResult =
   | BillDeltaOutOfCoverage
   | BillDeltaInputError;
 
+export type AssumptionTag = "conservative" | "median" | "upper-bound";
+
+// "cleared": a published PJM Base Residual Auction clearing price.
+// "assumption": no auction result exists yet; DEC-003 states the basis.
+export type PriceBasis = "cleared" | "assumption";
+
 export type LdaRateRecord = {
+  // PJM delivery year, June 1 to May 31.
+  delivery_year: string;
+  price_basis: PriceBasis;
+  // zone's BRA resource clearing price, USD / MW-day (UCAP).
+  capacity_price_usd_per_mw_day: number;
+  // same zone's 2024/2025 BRA clearing price, USD / MW-day (UCAP).
+  baseline_price_usd_per_mw_day: number;
+  // capacity_price_usd_per_mw_day - baseline_price_usd_per_mw_day.
   capacity_price_delta_usd_per_mw_day: number;
+  tag: AssumptionTag;
   source_url: string;
+  baseline_source_url: string;
   retrieved_iso: string;
   last_verified: string;
 };
@@ -89,99 +106,83 @@ export const ZIP_TO_LDA: ZipToLdaMap = {
   "606": "COMED",
 };
 
-// capacity-price deltas vs. the 2024/2025 base residual auction clearing
-// price ($28.92/MW-day system-wide). DOM zonal deltas extrapolate the
-// 2025/2026 BRA result (cleared $444.26/MW-day in DOM) forward through
-// 2030 under PJM's published load-forecast curve. tagged conservative
-// in DEC-001; DEC-002 (open) notes how far they sit below the 2026/27
-// and 2027/28 cleared prices.
+// capacity-price deltas, per DEC-003. each row is one PJM delivery year:
+// calculator year Y means the delivery year June 1, Y to May 31, Y+1.
 //
-// the 2026 and 2027 rows cite PJM's July 30, 2024 article on the
-// 2025/2026 BRA. that article anchors only the 2025/2026 base these
-// values are extrapolated from; it does not verify the row values, so
-// their last_verified dates stay at the original 2026-06 check.
+//   capacity_price_delta_usd_per_mw_day =
+//       capacity_price_usd_per_mw_day     # zone's BRA resource clearing price
+//     - baseline_price_usd_per_mw_day     # same zone, 2024/2025 BRA ($28.92)
+//
+// 2026-2028 are cleared BRA prices, read from PJM's BRA reports. every
+// LDA cleared at the price cap in all three auctions, so DOM and COMED
+// equal the RTO price. 2029 and 2030 have no auction result yet; their
+// prices are assumptions (price_basis "assumption"), see DEC-003.
+const PJM_BRA_2024_25 =
+  "https://www.pjm.com/-/media/DotCom/markets-ops/rpm/rpm-auction-info/2024-2025/2024-2025-base-residual-auction-report.ashx";
+const PJM_BRA_2026_27 =
+  "https://www.pjm.com/-/media/DotCom/markets-ops/rpm/rpm-auction-info/2026-2027/2026-2027-bra-report.pdf";
+const PJM_BRA_2027_28 =
+  "https://www.pjm.com/-/media/DotCom/markets-ops/rpm/rpm-auction-info/2027-2028/2027-2028-bra-report.pdf";
+const PJM_BRA_2028_29 =
+  "https://www.pjm.com/-/media/DotCom/markets-ops/rpm/rpm-auction-info/2028-2029/2028-2029-bra-results-report.pdf";
+const PJM_PARAMS_2029_30 =
+  "https://www.pjm.com/-/media/DotCom/markets-ops/rpm/rpm-auction-info/2029-2030/2029-2030-planning-period-parameters-for-base-residual-auction-report.pdf";
+const PJM_COLLAR_FILING_ER26_1556 =
+  "https://www.pjm.com/pjmfiles/directory/etariff/FercDockets/9481/20260227-er26-1556-000.pdf";
+
+// 2024/2025 BRA: COMED and the rest of RTO (DOM was not a modelled LDA)
+// cleared at $28.92/MW-day (2024/2025 BRA report, Table 3).
+export const BASELINE_PRICE_USD_PER_MW_DAY = 28.92;
+
+function rateRow(
+  delivery_year: string,
+  price_basis: PriceBasis,
+  capacity_price_usd_per_mw_day: number,
+  tag: AssumptionTag,
+  source_url: string
+): LdaRateRecord {
+  return {
+    delivery_year,
+    price_basis,
+    capacity_price_usd_per_mw_day,
+    baseline_price_usd_per_mw_day: BASELINE_PRICE_USD_PER_MW_DAY,
+    capacity_price_delta_usd_per_mw_day:
+      Math.round(
+        (capacity_price_usd_per_mw_day - BASELINE_PRICE_USD_PER_MW_DAY) * 100
+      ) / 100,
+    tag,
+    source_url,
+    baseline_source_url: PJM_BRA_2024_25,
+    retrieved_iso: "2026-10-20",
+    last_verified: "2026-10-20",
+  };
+}
+
+// one schedule for both zones: no LDA separated from the RTO price in
+// the 2026/27, 2027/28 or 2028/29 BRA, and the 2029/30 cap applies to
+// the RTO and every LDA.
+//   2026  2026/2027 BRA cleared $329.17 (cap) in every LDA.     median
+//   2027  2027/2028 BRA cleared $333.44 (cap) in every LDA.     median
+//   2028  2028/2029 BRA cleared $325.00 (cap) in every LDA.     median
+//   2029  assumption: the posted 2029/2030 BRA cap, $337.83.    upper-bound
+//         the auction runs December 2026 and cannot clear higher.
+//   2030  assumption: the 2029/2030 cap carried forward.        conservative
+//         the collar ends with 2029/2030 (ER26-1556); PJM's
+//         no-cap simulations of the last three BRAs cleared at
+//         $388.57-$776.69, all above it.
+function schedule(): Record<BillDeltaYear, LdaRateRecord> {
+  return {
+    2026: rateRow("2026/2027", "cleared", 329.17, "median", PJM_BRA_2026_27),
+    2027: rateRow("2027/2028", "cleared", 333.44, "median", PJM_BRA_2027_28),
+    2028: rateRow("2028/2029", "cleared", 325.0, "median", PJM_BRA_2028_29),
+    2029: rateRow("2029/2030", "assumption", 337.83, "upper-bound", PJM_PARAMS_2029_30),
+    2030: rateRow("2030/2031", "assumption", 337.83, "conservative", PJM_COLLAR_FILING_ER26_1556),
+  };
+}
+
 export const PJM_LDA_RATES: Record<LdaCode, Record<BillDeltaYear, LdaRateRecord>> = {
-  DOM: {
-    2026: {
-      capacity_price_delta_usd_per_mw_day: 20,
-      source_url:
-        "https://insidelines.pjm.com/pjm-capacity-auction-procures-sufficient-resources-to-meet-rto-reliability-requirement/",
-      retrieved_iso: "2026-06-20",
-      last_verified: "2026-06-20",
-    },
-    2027: {
-      capacity_price_delta_usd_per_mw_day: 35,
-      source_url:
-        "https://insidelines.pjm.com/pjm-capacity-auction-procures-sufficient-resources-to-meet-rto-reliability-requirement/",
-      retrieved_iso: "2026-06-20",
-      last_verified: "2026-06-20",
-    },
-    2028: {
-      capacity_price_delta_usd_per_mw_day: 55,
-      source_url:
-        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
-      retrieved_iso: "2026-06-20",
-      last_verified: "2026-06-20",
-    },
-    2029: {
-      capacity_price_delta_usd_per_mw_day: 80,
-      source_url:
-        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
-      retrieved_iso: "2026-06-20",
-      last_verified: "2026-06-20",
-    },
-    2030: {
-      capacity_price_delta_usd_per_mw_day: 110,
-      source_url:
-        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
-      retrieved_iso: "2026-06-20",
-      last_verified: "2026-06-20",
-    },
-  },
-  // COMED zonal deltas extrapolate the 2025/2026 BRA result (cleared
-  // $269.92/MW-day in ComEd, the rest-of-RTO price) forward through
-  // 2030 under PJM's published load-forecast curve. ($329.17/MW-day is
-  // the 2026/2027 BRA price, which cleared at the cap across the whole
-  // PJM footprint, ComEd included.) tagged conservative in DEC-001;
-  // values stay below the cleared ComEd zonal delta so the formula does
-  // not overstate exposure.
-  COMED: {
-    2026: {
-      capacity_price_delta_usd_per_mw_day: 15,
-      source_url:
-        "https://insidelines.pjm.com/pjm-capacity-auction-procures-sufficient-resources-to-meet-rto-reliability-requirement/",
-      retrieved_iso: "2026-06-22",
-      last_verified: "2026-06-22",
-    },
-    2027: {
-      capacity_price_delta_usd_per_mw_day: 28,
-      source_url:
-        "https://insidelines.pjm.com/pjm-capacity-auction-procures-sufficient-resources-to-meet-rto-reliability-requirement/",
-      retrieved_iso: "2026-06-22",
-      last_verified: "2026-06-22",
-    },
-    2028: {
-      capacity_price_delta_usd_per_mw_day: 45,
-      source_url:
-        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
-      retrieved_iso: "2026-06-22",
-      last_verified: "2026-06-22",
-    },
-    2029: {
-      capacity_price_delta_usd_per_mw_day: 65,
-      source_url:
-        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
-      retrieved_iso: "2026-06-22",
-      last_verified: "2026-06-22",
-    },
-    2030: {
-      capacity_price_delta_usd_per_mw_day: 90,
-      source_url:
-        "https://www.pjm.com/-/media/markets-ops/rpm/rpm-auction-info/2025-2026/2025-2026-base-residual-auction-report.ashx",
-      retrieved_iso: "2026-06-22",
-      last_verified: "2026-06-22",
-    },
-  },
+  DOM: schedule(),
+  COMED: schedule(),
 };
 
 const EIA_TABLE_5A =
@@ -292,6 +293,7 @@ export function billDelta(input: BillDeltaInput): BillDeltaResult {
     baseline_usd: cost.baseline_usd_per_year,
     sources: [
       rate.source_url,
+      rate.baseline_source_url,
       cost.household_plc_source_url,
       cost.data_center_load_share_source_url,
       cost.source_url,

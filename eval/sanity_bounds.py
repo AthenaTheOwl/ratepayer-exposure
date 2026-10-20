@@ -21,6 +21,11 @@ not depend on how the model combines them:
   5. anchor          COMED: the model's PLC priced at the 2025/26 ComEd
                      capacity-price change lands within 0.5x-2x of
                      ComEd's published residential bill increase.
+  6. price inputs    each price delta equals the zone's BRA price less
+                     its baseline; the baseline is the 2024/25 BRA price
+                     ($28.92); every price lies inside the BRA collar
+                     ($175.00 floor to the highest posted cap, $337.83).
+                     (DEC-003.)
 
 Python stdlib only; needs `npm install` first so node_modules/.bin/tsx
 exists. exits 0 on pass, 1 on a bound violation, 2 on a data shape or
@@ -59,6 +64,16 @@ LOAD_FACTOR_MIN, LOAD_FACTOR_MAX = 0.25, 1.0
 COMED_PUBLISHED_USD_PER_MONTH = 10.60
 COMED_PRICE_DELTA_2025_26 = 269.92 - 28.92
 ANCHOR_MIN_RATIO, ANCHOR_MAX_RATIO = 0.5, 2.0
+
+# DEC-003 price anchors, from PJM's own reports:
+# 2024/25 BRA report, Table 3: COMED and rest of RTO cleared $28.92.
+#   https://www.pjm.com/-/media/DotCom/markets-ops/rpm/rpm-auction-info/2024-2025/2024-2025-base-residual-auction-report.ashx
+# collar: 2028/29 cap $325.00 / floor $175.00; 2029/30 cap $337.83 /
+# floor $181.91 (2029/2030 planning parameters report). the 2026/27 and
+# 2027/28 caps were $329.17 and $333.44.
+#   https://www.pjm.com/-/media/DotCom/markets-ops/rpm/rpm-auction-info/2029-2030/2029-2030-planning-period-parameters-for-base-residual-auction-report.pdf
+BASELINE_PRICE_2024_25 = 28.92
+PRICE_MIN, PRICE_MAX = 175.00, 337.83
 
 
 def load_model_rows() -> dict:
@@ -135,11 +150,23 @@ def main() -> int:
                 f"delta {delta:.2f} exceeds the whole capacity-charge "
                 f"change {whole:.2f} (price x 365 x PLC)"
             )
+        cleared = number(row, "capacity_price_usd_per_mw_day")
+        base = number(row, "baseline_price_usd_per_mw_day")
+        if abs(base - BASELINE_PRICE_2024_25) > 1e-9:
+            problems.append(f"baseline {base} != 2024/25 BRA {BASELINE_PRICE_2024_25}")
+        if abs(price - (cleared - base)) > ROUNDING_USD:
+            problems.append(
+                f"price delta {price} != price {cleared} - baseline {base}"
+            )
+        if not PRICE_MIN <= cleared <= PRICE_MAX:
+            problems.append(
+                f"price {cleared} outside the {PRICE_MIN}-{PRICE_MAX} collar"
+            )
         status = "FAIL" if problems else "OK"
         line = (
             f"{status} zone={zone} year={year} delta={delta:.2f} "
             f"capacity_charge={whole:.2f} baseline={baseline:.2f} "
-            f"ratio={ratio:.4f}"
+            f"ratio={ratio:.4f} price={cleared:.2f} ({row.get('price_basis')})"
         )
         if problems:
             line += " [" + "; ".join(problems) + "]"
@@ -210,7 +237,7 @@ def main() -> int:
 
     print(
         f"\nOK: {rows} rows within the {BOUND:.1f}x ratio gate and the "
-        "capacity-charge ceiling; PLC, share and ComEd anchor checks pass."
+        "capacity-charge ceiling; price, PLC, share and ComEd anchor checks pass."
     )
     return 0
 

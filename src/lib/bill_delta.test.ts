@@ -2,15 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   billDelta,
   lookupLda,
+  BASELINE_PRICE_USD_PER_MW_DAY,
   COST_ALLOCATION,
   PJM_LDA_RATES,
+  VALID_YEARS,
   ZIP_TO_LDA,
 } from "./bill_delta";
 
-// three reference cases per DEC-001 tags:
-//   low      -> earliest year, smallest delta  (2026)
-//   median   -> middle year                    (2028)
-//   upper    -> last year, largest delta       (2030)
+// three reference cases: 2026, 2028 and 2030. since DEC-003 the price
+// rows are cleared BRA prices (2026-2028) and stated assumptions
+// (2029-2030), so the years no longer rise monotonically; 2028 (the
+// 2028/29 BRA, $325.00) is the smallest and 2029-2030 the largest.
 // hand-computed against the inlined DOM data so any drift in either the
 // formula or the data trips the test. formula per DEC-002:
 //   USD/MW-day x 365 day/yr x household PLC (MW) x data-center share.
@@ -28,7 +30,7 @@ function expectedDelta(year: 2026 | 2027 | 2028 | 2029 | 2030): number {
 }
 
 describe("billDelta — reference cases", () => {
-  it("low case: 2026 (conservative)", () => {
+  it("2026: 2026/27 BRA, cleared at $329.17", () => {
     const r = billDelta({ zip: "23219", year: 2026 });
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
@@ -36,28 +38,28 @@ describe("billDelta — reference cases", () => {
     expect(r.zip_prefix).toBe("232");
     expect(r.year).toBe(2026);
     expect(r.delta_usd).toBeCloseTo(expectedDelta(2026), 2);
-    expect(r.delta_usd).toBeCloseTo(2.04, 2);
+    expect(r.delta_usd).toBeCloseTo(30.69, 2);
     expect(r.baseline_usd).toBe(1785.24);
     expect(r.sources.length).toBeGreaterThanOrEqual(2);
     // sanity: a "low" reference must stay well under the 2x bound.
     expect(r.delta_usd / r.baseline_usd).toBeLessThan(0.5);
   });
 
-  it("median case: 2028", () => {
+  it("2028: 2028/29 BRA, cleared at $325.00", () => {
     const r = billDelta({ zip: "23219", year: 2028 });
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
     expect(r.delta_usd).toBeCloseTo(expectedDelta(2028), 2);
-    expect(r.delta_usd).toBeCloseTo(5.62, 2);
+    expect(r.delta_usd).toBeCloseTo(30.26, 2);
     expect(r.delta_usd / r.baseline_usd).toBeLessThan(1.0);
   });
 
-  it("upper case: 2030", () => {
+  it("2030: assumption, 2029/30 cap carried forward", () => {
     const r = billDelta({ zip: "23219", year: 2030 });
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
     expect(r.delta_usd).toBeCloseTo(expectedDelta(2030), 2);
-    expect(r.delta_usd).toBeCloseTo(11.24, 2);
+    expect(r.delta_usd).toBeCloseTo(31.57, 2);
     // even at the upper bound the sanity gate must pass.
     expect(r.delta_usd / r.baseline_usd).toBeLessThanOrEqual(2.0);
   });
@@ -78,25 +80,25 @@ function expectedComedDelta(
 }
 
 describe("billDelta — COMED reference cases", () => {
-  it("low case: 2026 maps 606 -> COMED", () => {
+  it("2026 maps 606 -> COMED", () => {
     const r = billDelta({ zip: "60601", year: 2026 });
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
     expect(r.lda).toBe("COMED");
     expect(r.zip_prefix).toBe("606");
     expect(r.delta_usd).toBeCloseTo(expectedComedDelta(2026), 2);
-    expect(r.delta_usd).toBeCloseTo(1.25, 2);
+    expect(r.delta_usd).toBeCloseTo(24.99, 2);
     expect(r.baseline_usd).toBe(1319.88);
     expect(r.sources.length).toBeGreaterThanOrEqual(2);
     expect(r.delta_usd / r.baseline_usd).toBeLessThan(0.5);
   });
 
-  it("upper case: 2030 stays under the 2x bound", () => {
+  it("2030 stays under the 2x bound", () => {
     const r = billDelta({ zip: "60601", year: 2030 });
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
     expect(r.delta_usd).toBeCloseTo(expectedComedDelta(2030), 2);
-    expect(r.delta_usd).toBeCloseTo(7.49, 2);
+    expect(r.delta_usd).toBeCloseTo(25.71, 2);
     expect(r.delta_usd / r.baseline_usd).toBeLessThanOrEqual(2.0);
   });
 });
@@ -222,5 +224,99 @@ describe("data integrity", () => {
     expect(lookupLda("23219")).toEqual({ prefix: "232", lda: "DOM" });
     expect(lookupLda("60601")).toEqual({ prefix: "606", lda: "COMED" });
     expect(lookupLda("99999")).toBeNull();
+  });
+});
+
+// DEC-003: the price rows are PJM Base Residual Auction resource clearing
+// prices for the delivery year starting June 1 of the calculator year,
+// less the same zone's 2024/2025 BRA price. the published values are
+// pinned here so an edit to the data has to be an edit to this list too.
+//   2024/25 BRA report, Table 3: COMED and rest of RTO $28.92.
+//   2026/27 BRA report: every LDA $329.17 (cap).
+//   2027/28 BRA report: every LDA $333.44 (cap).
+//   2028/29 BRA report: every LDA $325.00 (cap).
+//   2029/30 planning parameters: cap $337.83, floor $181.91 (no auction yet).
+describe("capacity price inputs (DEC-003)", () => {
+  const ldas = Object.keys(PJM_LDA_RATES) as Lda[];
+  const PUBLISHED: Record<Year, { dy: string; price: number; basis: string }> = {
+    2026: { dy: "2026/2027", price: 329.17, basis: "cleared" },
+    2027: { dy: "2027/2028", price: 333.44, basis: "cleared" },
+    2028: { dy: "2028/2029", price: 325.0, basis: "cleared" },
+    2029: { dy: "2029/2030", price: 337.83, basis: "assumption" },
+    2030: { dy: "2030/2031", price: 337.83, basis: "assumption" },
+  };
+
+  it("baseline is the 2024/2025 BRA price, $28.92, in both zones", () => {
+    expect(BASELINE_PRICE_USD_PER_MW_DAY).toBe(28.92);
+    for (const lda of ldas) {
+      for (const year of VALID_YEARS) {
+        const r = PJM_LDA_RATES[lda][year];
+        expect(r.baseline_price_usd_per_mw_day).toBe(28.92);
+        expect(r.baseline_source_url).toMatch(/2024-2025-base-residual-auction-report/);
+      }
+    }
+  });
+
+  it("each year carries the published price for its delivery year", () => {
+    for (const lda of ldas) {
+      for (const year of VALID_YEARS) {
+        const r = PJM_LDA_RATES[lda][year];
+        expect(r.delivery_year).toBe(PUBLISHED[year].dy);
+        expect(r.price_basis).toBe(PUBLISHED[year].basis);
+        expect(r.capacity_price_usd_per_mw_day).toBe(PUBLISHED[year].price);
+      }
+    }
+  });
+
+  it("delta = price - baseline, to the cent", () => {
+    for (const lda of ldas) {
+      for (const year of VALID_YEARS) {
+        const r = PJM_LDA_RATES[lda][year];
+        expect(r.capacity_price_delta_usd_per_mw_day).toBeCloseTo(
+          r.capacity_price_usd_per_mw_day - r.baseline_price_usd_per_mw_day,
+          2
+        );
+      }
+    }
+    expect(PJM_LDA_RATES.DOM[2026].capacity_price_delta_usd_per_mw_day).toBe(300.25);
+    expect(PJM_LDA_RATES.DOM[2027].capacity_price_delta_usd_per_mw_day).toBe(304.52);
+    expect(PJM_LDA_RATES.DOM[2028].capacity_price_delta_usd_per_mw_day).toBe(296.08);
+    expect(PJM_LDA_RATES.DOM[2029].capacity_price_delta_usd_per_mw_day).toBe(308.91);
+  });
+
+  it("cleared rows cite the PJM BRA report for that delivery year", () => {
+    for (const lda of ldas) {
+      for (const year of VALID_YEARS) {
+        const r = PJM_LDA_RATES[lda][year];
+        expect(r.source_url).toMatch(/^https:\/\/www\.pjm\.com\//);
+        if (r.price_basis === "cleared") {
+          expect(r.source_url).toContain(r.delivery_year.replace("/", "-"));
+          expect(r.source_url).toMatch(/bra-(results-)?report\.pdf$/);
+        }
+      }
+    }
+  });
+
+  it("prices sit inside the published collar and a plausible band", () => {
+    for (const lda of ldas) {
+      for (const year of VALID_YEARS) {
+        const p = PJM_LDA_RATES[lda][year].capacity_price_usd_per_mw_day;
+        // every BRA from 2026/27 to 2029/30 runs under a ~$175-$338 collar.
+        expect(p).toBeGreaterThanOrEqual(175);
+        expect(p).toBeLessThanOrEqual(337.83);
+      }
+    }
+  });
+
+  it("household bill delta stays in a sane band at these prices", () => {
+    for (const lda of ldas) {
+      for (const year of VALID_YEARS) {
+        const d = okDelta(lda, year);
+        // $5-$100 a year: well under 2x the bill, and far above the
+        // pre-DEC-003 fixture values ($1-$11).
+        expect(d).toBeGreaterThan(5);
+        expect(d).toBeLessThan(100);
+      }
+    }
   });
 });

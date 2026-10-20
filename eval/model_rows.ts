@@ -23,6 +23,11 @@ for (const [prefix, lda] of Object.entries(ZIP_TO_LDA)) {
       result: billDelta({ zip: prefix + "00", year }),
       capacity_price_delta_usd_per_mw_day:
         PJM_LDA_RATES[zone]?.[year]?.capacity_price_delta_usd_per_mw_day ?? null,
+      capacity_price_usd_per_mw_day:
+        PJM_LDA_RATES[zone]?.[year]?.capacity_price_usd_per_mw_day ?? null,
+      baseline_price_usd_per_mw_day:
+        PJM_LDA_RATES[zone]?.[year]?.baseline_price_usd_per_mw_day ?? null,
+      price_basis: PJM_LDA_RATES[zone]?.[year]?.price_basis ?? null,
       household_plc_mw: cost?.household_plc_mw ?? null,
       data_center_load_share: cost?.data_center_load_share ?? null,
       typical_residential_kwh_per_year: cost?.typical_residential_kwh_per_year ?? null,
