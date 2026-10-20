@@ -2,6 +2,10 @@
 
 Status: accepted for v0.1 (PJM DOM zone only).
 
+Superseded by: [DEC-002](DEC-002-capacity-obligation.md) (2026-10-19) for the
+formula, the `residential_allocation_share` calibration, and the
+`COST_ALLOCATION` tags and sources.
+
 Every assumption used by `src/lib/bill_delta.ts` is enumerated below
 with one of three tags. The tag pins the direction of the assumption so
 the calculator's bias cannot be quietly swapped from "conservative" to

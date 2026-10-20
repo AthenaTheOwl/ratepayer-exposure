@@ -8,7 +8,8 @@ Before updating rates, audit the units through every factor: dollars per MW-day 
 
 The next proposed fixture holds household consumption constant while varying only the allocation rule, then holds the tariff fixed while varying the large-load scenario. Report these effects separately. A zero allocation share should produce zero attributed amount; an out-of-coverage ZIP should remain out of coverage. Source reachability and retrieval dates do not establish continued tariff applicability. This note flags the required methodology review and makes no tariff or policy recommendation.
 
+Follow-up, October 19, 2026: [DEC-002](../decisions/DEC-002-capacity-obligation.md) replaces the kWh term with a stated household capacity obligation (PLC, MW) and removes the residential allocation share, so the consumption-based fixture plan above no longer applies. The named-tariff check this note asks for is still open: DEC-002 does not model how PJM capacity prices reach a Virginia residential bill, so the calculator's figures remain scenario calculations.
+
 ## References
 
-- https://www.ferc.gov/explainer-interconnection-final-rule
-- https://github.com/3orionkings/ai-product-team/blob/main/workflows/process-change.md
+- PJM Manual 18: PJM Capacity Market, Rev. 63, sections 1.2.1 and 7.4–7.5: an LSE's Locational Reliability Charge is its Daily Unforced Capacity Obligation (MW, built from customer Peak Load Contributions) multiplied by the Final Zonal Capacity Price ($/MW-day). https://www.pjm.com/-/media/DotCom/documents/manuals/m18.ashx (retrieved 2026-10-19)

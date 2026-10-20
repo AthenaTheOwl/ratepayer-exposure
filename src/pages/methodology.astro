@@ -14,42 +14,63 @@ type Assumption = {
   name: string;
   value: string;
   tag: "conservative" | "median" | "upper-bound";
+  basis: string;
   source_url: string;
   last_verified: string;
 };
 
-const EIA_TABLE5A =
-  "https://www.eia.gov/electricity/sales_revenue_price/pdf/table5_a.pdf";
+// tags per DEC-002, which supersedes the DEC-001 calibration.
+const PLC_TAG: Record<LdaCode, Assumption["tag"]> = {
+  DOM: "median",
+  COMED: "upper-bound",
+};
+
+const PLC_NOTE: Record<LdaCode, string> = {
+  DOM: "no published Dominion residential PLC found, so this value is unanchored; tagged median only because no direction of bias is established (DEC-002), not as the central value of published estimates.",
+  COMED:
+    "ComEd's published ~$10.60/month residential increase from the 2025/26 auction implies ~1.45 kW, so this runs high.",
+};
 
 function assumptionsFor(lda: LdaCode): Assumption[] {
   const c = COST_ALLOCATION[lda];
+  const kwh = c.typical_residential_kwh_per_year;
   return [
     {
-      name: `data_center_load_share (${lda})`,
-      value: c.data_center_load_share.toString(),
-      tag: "median",
-      source_url: c.source_url,
+      name: `household_plc_mw (${lda})`,
+      value: `${c.household_plc_mw} MW (${(c.household_plc_mw * 1000).toFixed(1)} kW)`,
+      tag: PLC_TAG[lda],
+      basis:
+        `assumption: ${kwh.toLocaleString("en-US")} kWh ÷ 8,760 h ÷ 0.5 ` +
+        `assumed load factor at PJM's five summer coincident peaks. ` +
+        PLC_NOTE[lda],
+      source_url: c.household_plc_source_url,
       last_verified: c.last_verified,
     },
     {
-      name: `residential_allocation_share (${lda})`,
-      value: c.residential_allocation_share.toString(),
+      name: `data_center_load_share (${lda})`,
+      value: c.data_center_load_share.toString(),
       tag: "conservative",
-      source_url: c.source_url,
+      basis:
+        "assumption, not a published figure. the PJM market monitor " +
+        "attributes $7.27B of $16.12B (45.1%) of 2026/27 BRA revenues " +
+        "to data-center load; this share sits well below that.",
+      source_url: c.data_center_load_share_source_url,
       last_verified: c.last_verified,
     },
     {
       name: `typical_residential_kwh_per_year (${lda})`,
-      value: c.typical_residential_kwh_per_year.toString() + " kWh",
+      value: kwh.toLocaleString("en-US") + " kWh",
       tag: "median",
-      source_url: EIA_TABLE5A,
+      basis: "EIA Table 5A, 2024: average monthly consumption × 12.",
+      source_url: c.source_url,
       last_verified: c.last_verified,
     },
     {
       name: `baseline_usd_per_year (${lda})`,
-      value: "$" + c.baseline_usd_per_year.toString(),
+      value: "$" + c.baseline_usd_per_year.toFixed(2),
       tag: "median",
-      source_url: EIA_TABLE5A,
+      basis: "EIA Table 5A, 2024: average monthly bill × 12.",
+      source_url: c.source_url,
       last_verified: c.last_verified,
     },
   ];
@@ -119,20 +140,39 @@ const assumptions: Assumption[] = ldas.flatMap(assumptionsFor);
 
     <h2>formula</h2>
     <pre>delta_usd(zone, year) =
-    capacity_price_delta_usd_per_mw_day(zone, year)
-  * 365
-  * residential_allocation_share(zone)
-  * data_center_load_share(zone)
-  * typical_residential_kwh_per_year(zone)
-  / 1000   # kWh -> MWh; result lands in USD/year per customer
+    capacity_price_delta_usd_per_mw_day(zone, year)   # USD / MW-day
+  * 365                                               # day / year
+  * household_plc_mw(zone)                            # MW
+  * data_center_load_share(zone)                      # dimensionless
+                                                      # = USD / year
 
 baseline_usd(zone) = static field on the cost_allocation record
 </pre>
     <p>
+      a capacity price is charged per MW of capacity obligation. PJM
+      bills a load-serving entity its daily unforced capacity
+      obligation (MW, built from its customers' peak load contributions,
+      or PLC) times the zonal capacity price
+      (<a href="https://www.pjm.com/-/media/DotCom/documents/manuals/m18.ashx" rel="noopener">PJM Manual 18</a>).
+      the household's PLC is the MW term above. price × 365 × PLC is the
+      household's whole capacity-charge change; the data-center share is
+      a slice of it, so the calculator's figure can never exceed it.
+    </p>
+    <p>
+      an earlier version (DEC-001) multiplied the price by annual kWh ÷
+      1000 and by a 0.04 "residential allocation share". kWh is energy,
+      so the result was not a capacity charge: it put the 2030 Richmond
+      figure at $2,248 a year, about 20 times the household's whole
+      capacity-charge change at that price. a per-customer PLC already
+      carries the residential class's allocation, so the residential
+      share is gone. DEC-002 records the change.
+    </p>
+    <p>
       see <code>src/lib/bill_delta.ts</code> for the implementation.
       a vitest suite (<code>src/lib/bill_delta.test.ts</code>) pins
       three reference cases (low / median / upper) against
-      hand-computed values.
+      hand-computed values, plus unit checks: annual kWh must not move
+      the result, and the result must stay under price × 365 × PLC.
     </p>
 
     <h2>v0.2 coverage</h2>
@@ -145,13 +185,14 @@ baseline_usd(zone) = static field on the cost_allocation record
       more PJM zones in spec 0005.
     </p>
 
-    <h2>assumptions (DEC-001 charter)</h2>
+    <h2>assumptions (DEC-001 charter, DEC-002 revision)</h2>
     <p>
       every assumption used by <code>billDelta()</code> appears in the
-      table below with its DEC-001 tag and a source URL. the full
-      narrative for each tag lives in
-      <a href="https://github.com/">decisions/DEC-001-assumption-charter.md</a>
-      in the repo.
+      table below with its tag, its basis and a source URL. the tag
+      definitions live in
+      <a href="https://github.com/AthenaTheOwl/ratepayer-exposure/blob/main/decisions/DEC-001-assumption-charter.md" rel="noopener">decisions/DEC-001-assumption-charter.md</a>;
+      the current formula, tags and sources in
+      <a href="https://github.com/AthenaTheOwl/ratepayer-exposure/blob/main/decisions/DEC-002-capacity-obligation.md" rel="noopener">decisions/DEC-002-capacity-obligation.md</a>.
     </p>
     <table>
       <thead>
@@ -159,6 +200,7 @@ baseline_usd(zone) = static field on the cost_allocation record
           <th>assumption</th>
           <th>value</th>
           <th>tag</th>
+          <th>basis</th>
           <th>source</th>
           <th>last verified</th>
         </tr>
@@ -169,6 +211,7 @@ baseline_usd(zone) = static field on the cost_allocation record
             <td><code>{a.name}</code></td>
             <td>{a.value}</td>
             <td><span class={`tag ${a.tag}`}>{a.tag}</span></td>
+            <td>{a.basis}</td>
             <td><a href={a.source_url} rel="noopener">source</a></td>
             <td>{a.last_verified}</td>
           </tr>
@@ -210,11 +253,32 @@ baseline_usd(zone) = static field on the cost_allocation record
 
     <h2>sanity bound</h2>
     <p>
-      <code>eval/sanity_bounds.py</code> walks every covered (zone,
-      year) and asserts <code>delta_usd / baseline_usd &lt;= 2.0</code>.
+      <code>eval/sanity_bounds.py</code> runs the same model the
+      calculator ships (it does not keep a second copy of the formula)
+      and, for every covered (zone, year), asserts:
+    </p>
+    <ul>
+      <li><code>delta_usd / baseline_usd &lt;= 2.0</code>;</li>
+      <li>
+        <code>delta_usd &lt;= price × 365 × household_plc_mw</code>: the
+        data-center slice stays within the household's whole
+        capacity-charge change;
+      </li>
+      <li>
+        each PLC is 0.5-10 kW with an implied load factor (annual kWh ÷
+        8,760 ÷ PLC kW) of 0.25-1.0, so an energy figure entered as a
+        capacity figure fails;
+      </li>
+      <li>
+        the ComEd PLC, priced at the 2025/26 ComEd change ($269.92 −
+        $28.92 per MW-day), lands within 0.5x-2x of ComEd's published
+        ~$10.60/month residential increase.
+      </li>
+    </ul>
+    <p>
       a violation either means a real edge case (which must be called
       out here) or a bug (which must be fixed before the build can
-      ship). v0.1 wires this as <code>npm run check:bounds</code>.
+      ship). CI runs it as <code>npm run check:bounds</code>.
     </p>
 
     <h2>what v0.1 does not cover (deferred to spec 0003+)</h2>

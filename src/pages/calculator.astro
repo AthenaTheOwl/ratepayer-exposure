@@ -12,7 +12,7 @@ const years = [...VALID_YEARS];
     <title>ratepayer exposure calculator</title>
     <meta
       name="description"
-      content="per-customer bill-delta from data-center load growth, PJM DOM zone, 2026-2030"
+      content="per-customer bill-delta from data-center load growth, PJM DOM and ComEd zones, 2026-2030"
     />
     <style>
       body {
@@ -62,9 +62,12 @@ const years = [...VALID_YEARS];
     <p>
       enter a US ZIP code and a year (2026-2030). returns the projected
       annual bill-delta attributable to data-center load growth in the
-      local PJM zone. v0.2 covers two zones: Richmond, VA (DOM zone, ZIP
-      232xx) and Chicago, IL (ComEd zone, ZIP 606xx). every other ZIP
-      returns the literal sentinel below.
+      local PJM zone: the capacity-price change, times one household's
+      capacity obligation (its peak load contribution, in MW), times the
+      share of that change attributed to data-center load. v0.2 covers
+      two zones: Richmond, VA (DOM zone, ZIP 232xx) and Chicago, IL
+      (ComEd zone, ZIP 606xx). every other ZIP returns the literal
+      sentinel below.
     </p>
     <p>
       computation runs entirely in this browser tab. nothing is sent to a
@@ -125,7 +128,8 @@ const years = [...VALID_YEARS];
         return n.toLocaleString("en-US", {
           style: "currency",
           currency: "USD",
-          maximumFractionDigits: 0,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
         });
       }
 
